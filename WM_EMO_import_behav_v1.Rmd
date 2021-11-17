@@ -240,7 +240,7 @@ AllData$Response_binom <- as.numeric(AllData$Response_binom)
 ```
 
 
-Here is the schema with the different timing of events in the task. </br>
+Here is the task schema with the different events and their related timing. </br>
 The ITI depended on the time took by the participant to answer (no time limit for answering). </br>
 N=13</br>
 
