@@ -239,8 +239,6 @@ AllData$Response_binom <- as.numeric(AllData$Response_binom)
   
 ```
 
-Note and question: can we really say "Memory Load" for characterizing the difference between the condition where you need to detect 2 vs 4 variations in the second pattern presented during trials? The memory load is always the same: you need to memorize the orientation of all the elements included in the first pattern, but the load does not vary as the number of elements in pattern 1 is always the same. Does this condition should better be named "easy vs. difficult pattern recognition"? 
-
 
 Here is the schema with the different timing of events in the task. </br>
 The ITI depended on the time took by the participant to answer (no time limit for answering). </br>
