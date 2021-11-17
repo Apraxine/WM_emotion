@@ -1,7 +1,7 @@
 ---
 title: "WM load and emotion: behavioral data analysis"
 author: "Roxane Hoyer"
-date: "2021.11.11"
+date: "2021.11.17"
 output:
   rmdformats::readthedown:
     self_contained: true
@@ -256,7 +256,7 @@ N=13</br>
 
 ## Accuracy
 
-Number of trials by load and emotion conditions
+Number of trials by load and emotion conditions:
 
 ```{r, echo = FALSE, message = FALSE}
 AllData %>%
