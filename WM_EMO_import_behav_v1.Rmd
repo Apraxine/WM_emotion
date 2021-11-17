@@ -1,0 +1,621 @@
+---
+title: "WM load and emotion: behavioral data analysis"
+author: "Roxane Hoyer"
+date: "2021.11.11"
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    code_folding: "hide"
+    toc_depth: 5
+  html_document:
+    code_folding: "hide"
+    latex_engine: xelatex
+    self_contained: yes
+    fig_caption: yes
+   
+# Le problème df not found venait du fait que je demandais au prog de générer le fichier html dans un dossier spécifique 
+
+
+---
+<style>
+body {
+text-align: justify}
+</style>
+
+```{css, echo=FALSE}
+
+h1{color:#581845;} <!-- colors of titles -->
+h2{color:#900C3F;}
+h3{color:#C70039;}
+h4{color:#FF5733;}
+
+
+#sidebar {
+    position: fixed;
+    top: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #63545E; <!-- color of sidebar background  -->
+    z-index: 200;
+    font-size: 16px;
+}
+
+
+#sidebar h2 {
+    z-index: 200;
+    background-color: #581845; <!-- color of sidebar header -->
+    text-align: center;
+    padding: 0.809em;
+    display: block;
+    font-size: 100%;
+    margin-top: 0px;
+    margin-bottom: 0.809em;
+}
+
+
+
+#sidebar a {
+    display: inline-block;
+    line-height: 18px;
+    padding: 0.4045em 1.618em;
+    display: block;
+    position: relative;
+    font-size: 90%;
+    color: #ffffff; 
+    direction: ltr;
+    text-decoration: none;
+}
+
+  
+#toc ul.nav li.active a {
+    color: #2C122D !important; <!-- color of title in the side bar -->
+    font-weight: bold;
+    background-color: #C2B9C2 ;  <!-- color of html link -->
+    border-right: solid 0px white !important;
+}
+  
+
+
+#main :not(.leaflet-control) > a {
+    background-image: linear-gradient(180deg,#DCCED8,#CCAEC4); <!-- color of highlight for html link in text -->
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: 0 2em;
+    color: #735E6C;  <!-- color of html link -->
+    font-weight: 300;
+    padding: .125em 1px 0 1px;
+    transition: background-position .15s, color .15s;
+}
+
+
+#toc ul.nav li.active ul li.active a {
+    background-color: #ffffff;
+    color: black !important;
+    font-weight: bold !important;
+}
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+
+
+library(itsadug)
+library(mgcv)
+library(mgcViz)
+library(tidyverse)
+library(visreg)    # GAM model visualisation
+library(permutes)
+library(patchwork)
+
+library(afex)       # nouveau package, surveiller les MAJ
+library(lme4)
+library(RVAideMemoire)
+library(LMERConvenienceFunctions)
+library(phia)
+library(multcomp)
+library(lmerTest)
+library(emmeans)
+library(ggpubr)
+library(ggeffects)
+library(sjPlot)
+library(vtree)
+
+library(DHARMa)
+
+library(jtools) #summ function 
+
+library(splines)#to modelize with a regression slope that is inflected 
+library(rcompanion)#to compared GLM models
+library(rmdformats)
+
+library(tinytex)
+library(formatR)
+library(ggplot2)
+library(ggridges)
+library(viridis)
+library(hrbrthemes)
+library(forcats)
+library(lme4)
+library(car)
+library(plotly)
+library(extrafont)
+library(RColorBrewer)
+library(colorspace)
+library(lsmeans)
+library(LMERConvenienceFunctions)
+library(gridExtra)
+library(multcompView)
+library(emmeans)
+library(tidyverse)
+library(stats) 
+library(ggmosaic)
+library(janitor)
+library(forcats)
+library(multcomp)
+library(reshape2)
+library(DescTools)
+library(PMCMR)
+library(R.matlab)
+library(kableExtra)
+library(jtools)
+library(ggstance)
+library(lmtest)
+library(prettydoc)
+library(sjPlot)
+
+
+```
+
+
+```{r Path and load/read csv}
+
+rm(list = ls())
+
+# file path
+filename = "C:/Users/Roxane Hoyer/Desktop/R/R_WM_emotion/Data/behav_data_WM_emotion_goodone.csv"
+GraphSave  = "C:/Users/Roxane Hoyer/Desktop/R/R_WM_emotion/Graph/"
+
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+std_err <- function(x) sd(x)/sqrt(length(x))
+
+quantiles_95 <- function(x) {
+  r <- quantile(x, probs=c(0.05, 0.25, 0.5, 0.75, 0.95))
+  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
+  r 
+}
+
+
+# read csv 
+AllData <- read.csv2(filename, header = TRUE, dec = ",", sep = ";")
+
+AllData %>%
+  drop_na(Subject) %>%
+  filter(Subject != "") %>%
+  dplyr::filter(Condition != "Practice") -> AllData
+
+AllData$Condition <- as.character(AllData$Condition)
+Load <- substr(AllData$Condition,1,2) ## extract char 1 to 2 
+AllData <- cbind(AllData, Load) ## concat the var to the main df
+
+AllData$Condition <- as.character(AllData$Condition)
+Emotion <- substr(AllData$Condition,4,4) 
+AllData <- cbind(AllData, Emotion) 
+
+AllData$Condition <- as.character(AllData$Condition)
+Side <- substr(AllData$Condition,6,6) 
+AllData <- cbind(AllData, Side) 
+
+AllData$Load = as.factor(AllData$Load)
+levels(AllData$Load) =  list(Low=c("LW"), High=c("HW"))
+AllData$Load <- relevel(AllData$Load, ref = "Low")
+
+AllData$Emotion = as.factor(AllData$Emotion)
+levels(AllData$Emotion) =  list(Anger=c("A"), Happiness=c("H"), Neutral=c("N"))
+AllData$Emotion <- relevel(AllData$Emotion, ref = "Neutral")
+
+AllData$Side = as.factor(AllData$Side)
+levels(AllData$Side) =  list(Left=c("L"), Right=c("R"))
+AllData$Side <- relevel(AllData$Side, ref = "Right")
+
+AllData$RT <- as.numeric(AllData$RT)
+
+AllData <- AllData %>%
+  mutate(Response_binom = Response)
+  AllData$Response_binom[AllData$Response_binom == "Incorrect"] <- 0 
+  AllData$Response_binom[AllData$Response_binom == "Hit"] <- 1
+
+AllData$Response_binom <- as.numeric(AllData$Response_binom)
+
+  
+  
+```
+
+Note and question: can we really say "Memory Load" for characterizing the difference between the condition where you need to detect 2 vs 4 variations in the second pattern presented during trials? The memory load is always the same: you need to memorize the orientation of all the elements included in the first pattern, but the load does not vary as the number of elements in pattern 1 is always the same. Does this condition should better be named "easy vs. difficult pattern recognition"? 
+
+
+Here is the schema with the different timing of events in the task. </br>
+The ITI depended on the time took by the participant to answer (no time limit for answering). </br>
+N=13</br>
+
+<center>
+![Behavioral task](C:\Users\Roxane Hoyer\Desktop\R\R_WM_emotion\protocol1.png)
+</center>
+
+
+
+# Data visualization
+
+## Accuracy
+
+Number of trials by load and emotion conditions
+
+```{r, echo = FALSE, message = FALSE}
+AllData %>%
+  group_by(Subject, Condition, Response) %>%
+  dplyr::summarise(nb.trial = n(), Load = unique(Load), Emotion = unique(Emotion)) %>%
+  group_by(Load, Emotion, Response) %>%
+  dplyr::summarise(mean.trial = mean(nb.trial), sd.trial = sd(nb.trial), sem.trial = std_err(nb.trial)) -> x
+x
+```
+
+Correct response percentage by load and emotion conditions:
+
+```{r, echo = FALSE, message = FALSE, fig.align="center"}
+AllData %>%
+  group_by(Subject, Load, Emotion) %>%
+  dplyr::summarise(pct = round(sum(Response_binom)/n()*100, digits = 2)) %>%
+  group_by(Load, Emotion) %>%
+  dplyr::summarise(m.cor = mean(pct), sd.trial = sd(pct), sem.trial = std_err(pct)) %>%
+  ggplot(aes(x=Load,y=m.cor,fill=Emotion)) + 
+  geom_bar(stat="identity",position = "dodge", alpha=.7) +
+  geom_errorbar(aes(ymin=m.cor-sem.trial, ymax=m.cor+sem.trial), width=.2, position=position_dodge(.9)) +
+  scale_fill_manual(values = c(Happiness = "green4", Anger = "darkred", Neutral = "deepskyblue4"))  +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by=20)) +
+  labs(title="Accuracy according to the load and emotion conditions", 
+       x="Emotion", 
+       y="Correct responses (%)") + 
+  theme_bw() +
+  theme(plot.title   = element_text(color = "black", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "black", size = 11, hjust = 1),
+        axis.title.y = element_text(color = "black", size = 11, hjust = 1),
+        axis.text    = element_text(size  = 10 ),
+        panel.border = element_blank(),
+        strip.background = element_rect(colour="gray94", fill="gray94")) 
+ggsave(paste(GraphSave, "BARPLOT_ACCURACY_LOAD_EMOTION.png"), type = 'cairo', units = c("cm"), width = 25, height = 10)
+```
+
+Here the error bars represent the standard error of the mean. 
+
+```{r, echo = FALSE, message = FALSE, fig.align="center"}
+
+loadlab <- c(`High` = "High load", `Low` = "Low load")
+
+AllData %>%
+  group_by(Subject, Load, Emotion) %>%
+  dplyr::summarise(pct = round(sum(Response_binom)/n()*100, digits = 2)) %>%
+  ggplot(aes(x = Emotion, y = pct, color = Emotion)) +
+  geom_jitter(size=2, alpha=.7) +
+  scale_color_manual(values = c(Happiness = "green4", Anger = "darkred", Neutral = "deepskyblue4"))  +
+  scale_y_continuous(limits = c(40, 100), breaks = seq(40, 100, by=10)) +
+  facet_wrap(~Load, labeller = as_labeller(loadlab))  +
+  theme_bw() +
+  theme(plot.title   = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, hjust = 1),
+        axis.title.y = element_text(color = "black", size = 14, hjust = 1),
+        panel.border = element_blank(),
+        axis.text    = element_text(size  = 12), 
+        legend.position = "none",
+        strip.background = element_rect(colour="gray94", fill="gray94")) +
+  labs(title = "Accuracy distribution according to the load and emotion conditions ", 
+       x="Emotion", 
+       y="Correct responses (%)") 
+ggsave(paste(GraphSave, "ACCURACY_LOAD_EMOTION_boxplotmean.png"), type = 'cairo', units = c("cm"), width = 20, height = 10)
+```
+
+```{r, echo = FALSE, message = FALSE}
+
+AllData %>%
+  group_by(Subject, Load, Emotion) %>%
+  dplyr::summarise(pct = round(sum(Response_binom)/n()*100, digits = 2)) %>%
+  filter(pct < 60) ->x 
+
+print(x)
+
+```
+
+One participant (PP17) seem to have struggled with the task, with a mean accuracy < 60% in all conditions. 
+Another participant (PP10) showed an accuracy rate lower than 60% in the High Load neutral condition only.
+
+
+## Reaction times
+
+Here is a summary of the RT variable:
+
+```{r, echo = FALSE, message = FALSE}
+summary(AllData$RT)
+
+```
+
+
+Now let's see how the RT distribution behave as a function or the load and emotions conditions:
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.align="center"}
+
+AllData %>%
+  mutate(text = fct_reorder(Emotion, RT)) %>%
+  ggplot( aes(y=Emotion, x=RT,  fill=Emotion)) +
+  geom_density_ridges(alpha=0.6, stat="binline", bins=100) +
+  facet_grid(. ~Load) +
+  scale_x_continuous(limits = c(500, 7500), breaks = seq(500, 7500, by=1500)) +
+  scale_fill_manual(values = c(Happiness = "green4", Anger = "darkred", Neutral = "deepskyblue4"))  +
+  theme_ridges() +
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 15)
+  ) +
+  labs(title = "RT distribution according to the load and emotion conditions", 
+       x="Emotion", 
+       y="number of RT in each 100 ms bin") 
+ggsave(paste(GraphSave, "DISTRIB_RT_LOAD_EMOTION1.png"), type = 'cairo', units = c("cm"), width = 30, height = 20)
+
+```
+
+At first sight, RT distribution is likely to fit a gamma distribution. 
+
+```{r, echo = FALSE, message = FALSE, fig.align="center"}
+
+loadlab <- c(`High` = "High load", `Low` = "Low load")
+
+AllData %>%
+  ggplot(aes(x = Emotion, y = RT, color = Emotion)) +
+  geom_jitter(size=2, alpha=.7) +
+  scale_color_manual(values = c(Happiness = "green4", Anger = "darkred", Neutral = "deepskyblue4"))  +
+  scale_y_continuous(limits = c(500, 7500), breaks = seq(500, 7500, by=1000)) +
+  facet_wrap(~Load, labeller = as_labeller(loadlab))  +
+  theme_bw() +
+  theme(plot.title   = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, hjust = 1),
+        axis.title.y = element_text(color = "black", size = 14, hjust = 1),
+        panel.border = element_blank(),
+        axis.text    = element_text(size  = 12), 
+        legend.position = "none",
+        strip.background = element_rect(colour="gray94", fill="gray94")) +
+  labs(title = "RT distribution according to the load and emotion conditions", 
+       x="Emotion", 
+       y="Median RT (ms)") 
+ggsave(paste(GraphSave, "DISTRIB_RT_LOAD_EMOTION2.png.png"), type = 'cairo', units = c("cm"), width = 20, height = 10)
+```
+
+7 observations could be removed from analysis if we choose to consider them as outliers. </br>
+These observations (data from 4 different participants) are listed below. 
+
+```{r, echo = FALSE, message = FALSE}
+
+AllData %>%
+  filter(RT > 5000) -> x
+print(x)
+
+```
+
+
+The median RT distribution is quite acceptable and there is no outliers. </br>
+This suggests that <strong> we do not need to remove the aforementioned 7 RT > 5000 ms</strong>.
+
+```{r, echo = FALSE, message = FALSE, fig.align="center"}
+
+loadlab <- c(`High` = "High load", `Low` = "Low load")
+
+AllData %>%
+  group_by(Emotion, Load, Subject) %>%
+  dplyr::summarise(medRT = median(RT)) %>%
+  ggplot(aes(x = Emotion, y = medRT, color = Emotion)) +
+  geom_jitter(size=2, alpha=.7) +
+  scale_color_manual(values = c(Happiness = "green4", Anger = "darkred", Neutral = "deepskyblue4"))  +
+  scale_y_continuous(limits = c(1250, 2500), breaks = seq(1250, 2500, by=250)) +
+  facet_wrap(~Load, labeller = as_labeller(loadlab))  +
+  theme_bw() +
+  theme(plot.title   = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, hjust = 1),
+        axis.title.y = element_text(color = "black", size = 14, hjust = 1),
+        panel.border = element_blank(),
+        axis.text    = element_text(size  = 12), 
+        legend.position = "none",
+        strip.background = element_rect(colour="gray94", fill="gray94")) +
+  labs(title = "Median RT distribution according to the load and emotion conditions", 
+       x="Emotion", 
+       y="Median RT (ms)") 
+ggsave(paste(GraphSave, "DISTRIB_MEDRT_LOAD_EMOTION1.png.png"), type = 'cairo', units = c("cm"), width = 20, height = 10)
+```
+
+# Modelization and statistics 
+
+## Accuracy
+
+### Modelization
+
+Because participants had two possible type of responses (i.e., Hit and Incorrect), the errors distribution is binomial.</br>
+Binomial Generalized Linear Mixed Models, or binomial GLMMs, are useful for modeling binary outcomes for repeated or clustered measures.</br>
+Here, we assume that the relationship between the mean of the response and explanatory variables is linear on the logit scale. </br>
+
+The model is build using raw accuracy measurements (coded as "1" for Hit, and "0" for Incorrect), with 2 fixed factor (LOAD and EMOTION) and 1 random factor (SUBJECT; i.e., random intercept by subject for regression).
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+model.01 <- glmer(Response_binom ~ Emotion*Load + (1|Subject),
+                 data = AllData, family = binomial(link = "logit")) #add linear pred
+
+summary(model.01)
+
+```
+
+
+It is always complex to assess the goodness of fit for binomial models, but here is the distribution of residuals, which seems quite good for a binomial GLMM.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.align="center"}
+plot(model.01)
+```
+
+
+### Statistics
+
+The type II Wald test indicate that there is a <strong>main effect of the LOAD on accuracy</strong>.</br>
+There is no effect of the EMOTION factor on accuracy. 
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+stat.model.01<- Anova(model.01, type = 'II')
+
+print(stat.model.01, digits = 3)
+
+```
+
+
+```{r, echo = FALSE, message = FALSE, fig.align="center"}
+
+
+AllData %>%
+  group_by(Subject, Load) %>%
+  dplyr::summarise(pct = round(sum(Response_binom)/n()*100, digits = 2)) %>%
+  ggplot(aes(x = Load, y = pct, fill = Load)) +
+  stat_summary(fun.data = quantiles_95, geom="boxplot") +
+  geom_jitter(color="black", size=1.5) +
+  geom_signif(comparisons=list(c("High", "Low")), annotations="***",
+              y_position = 89, tip_length = 0, vjust=0.4, size= 1) +
+  scale_y_continuous(limits = c(40, 100), breaks = seq(40, 100, by=10)) +
+  
+  scale_fill_manual(values = c(High = "green4", Low = "orange"))  +
+  theme_bw() +
+  theme(
+    plot.title   = element_text(color = "black", size = 14, face = "bold"),
+    axis.title.x = element_text(color = "black", size = 14, hjust = 1),
+    axis.title.y = element_text(color = "black", size = 14, hjust = 1),
+    panel.border = element_blank(),
+    axis.text    = element_text(size  = 12), 
+    legend.position = "none",
+    strip.background = element_rect(colour="gray94", fill="gray94"))+
+  labs(title="Accuracy according to the cognitive load", 
+       x="Load", 
+       y="Correct responses (%)") 
+ggsave(paste(GraphSave, "ACCURACY_boxplotmean.png"), type = 'cairo', units = c("cm"), width = 20, height = 10)
+
+
+```
+<p style="text-align: center;"><em><font size="2">Accuracy as a function of the load. Within each boxplot (Tukey method), the horizontal line represents the mean, the box delineates the area between the first and third quartiles (interquartile range); the vertical line represents the interval between quantile 5 and 90 (i.e., the dispersion of 90% of the population); juxtaposed to each boxplot, the dots represent individual performance.</em></font></p>
+
+
+## RT
+
+### Modelization
+
+The models are build using raw RT, with 2 fixed factor (LOAD and EMOTION) and 1 random factor (SUBJECT; i.e., random intercept by subject for regression).
+
+Here, we fitted the RT distribution with both gaussian and gamma distributions, with a log link or not, and compared these 4 models. There is no significant big difference between these 4 models. The AIC and BIC criterion are lower for the model.3 (model with a simple gamma distribution), but there were convergence warnings for models with gamma distribution ("Model failed to converge with max|grad", not solved using different kind of optimizers).
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, error=TRUE}
+
+
+model.rt.01 <- glmer(RT ~ Load*Emotion + (1|Subject),
+                 data = AllData, family = gaussian())
+
+model.rt.02 <- glmer(RT ~ Load*Emotion + (1|Subject),
+                 data = AllData, family = gaussian(link = "log"))
+
+model.rt.03 <- glmer(RT ~ Load*Emotion + (1|Subject), #best model
+                 data = AllData, family = Gamma(), glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)))
+
+model.rt.04 <- glmer(RT ~ Load*Emotion + (1|Subject),
+                 data = AllData, family = Gamma(link = "log"), glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+
+ModelComparison <- anova(model.rt.01, model.rt.02, model.rt.03, model.rt.04)
+ModelComparison
+
+```
+
+Here, a solution is then to only compare the models fitted with a Gaussian distribution. The first model (without log link) seems better than the second one based on the AIC and BIC criterion. The first model will then be kept for running variance analysis.  
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+ModelComparison <- anova(model.rt.01, model.rt.02)
+ModelComparison
+
+
+summary(model.rt.01)
+
+```
+
+
+Now, let's visually check the goodness of fit for our model. As observable below, the model seems well describe the data.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.align="center"}
+
+model.rt.01 <- glmer(RT ~ Load + Emotion + (1|Subject),
+                 data = AllData, family = gaussian())
+
+
+summary(model.rt.01)
+# 
+# library(performance)
+# check_distribution(model.rt.01)
+# check_model(model.rt.01)
+# ggsave(paste(GraphSave, "RT_checkmodel01.png"), type = 'cairo', units = c("cm"), width = 30, height = 25)
+
+```
+<center>
+![Residuals for model RT, visual checks](C:\Users\Roxane Hoyer\Desktop\R\R_WM_emotion\RT_checkmodel01.png)
+</center>
+
+
+### Statistics
+
+
+Here, the variance analysis revealed a <strong>main effect of the LOAD on RT</strong>. </br> 
+There is no effect of the EMOTION factor on RT. 
+
+```{r, echo = FALSE, message = FALSE}
+stat.model.rt.01<- Anova(model.rt.01, type = 'II')
+
+print(stat.model.rt.01, digits = 3)
+
+```
+
+```{r, echo = FALSE, message = FALSE, fig.align="center"}
+
+
+AllData %>%
+  group_by(Subject, Load) %>%
+  dplyr::summarise(pct = median(RT)) %>%
+  ggplot(aes(x = Load, y = pct, fill = Load)) +
+  stat_summary(fun.data = quantiles_95, geom="boxplot") +
+  geom_jitter(color="black", size=1.5) +
+  geom_signif(comparisons=list(c("High", "Low")), annotations="***",
+              y_position = 2200, tip_length = 0, vjust=0.4, size= 1) +
+  scale_y_continuous(limits = c(1000, 2400), breaks = seq(1000, 2400, by=200)) +
+  
+  scale_fill_manual(values = c(High = "green4", Low = "orange"))  +
+  theme_bw() +
+  theme(
+    plot.title   = element_text(color = "black", size = 14, face = "bold"),
+    axis.title.x = element_text(color = "black", size = 14, hjust = 1),
+    axis.title.y = element_text(color = "black", size = 14, hjust = 1),
+    panel.border = element_blank(),
+    axis.text    = element_text(size  = 12), 
+    legend.position = "none",
+    strip.background = element_rect(colour="gray94", fill="gray94"))+
+  labs(title="Median RT according to the cognitive load", 
+       x="Load", 
+       y="Median RT (ms)") 
+ggsave(paste(GraphSave, "RT_boxplotmean.png"), type = 'cairo', units = c("cm"), width = 20, height = 10)
+
+
+```
+<p style="text-align: center;"><em><font size="2">Median RT as a function of the load. Within each boxplot (Tukey method), the horizontal line represents the mean, the box delineates the area between the first and third quartiles (interquartile range); the vertical line represents the interval between quantile 5 and 90 (i.e., the dispersion of 90% of the population); juxtaposed to each boxplot, the dots represent individual performance.</em></font></p>
+
